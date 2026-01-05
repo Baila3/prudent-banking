@@ -1,21 +1,23 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-# Import the Transaction class and the database setup
-from database import engine, Base, get_db, Transaction 
+from database import engine, Base, get_db, Transaction, User
+from sqlalchemy import func
 
-# This creates the tables in Postgres if they don't exist
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# --- SCHEMAS (Pydantic) ---
-# This defines the data structure the API expects to receive
+
 class TransactionCreate(BaseModel):
     amount: float
     category: str
     merchant: str
     user_id: int
+class UserCreate(BaseModel):
+    email: str
+    risk_tolerance: str
+
 
 # --- ROUTES ---
 
@@ -23,11 +25,61 @@ class TransactionCreate(BaseModel):
 def health_check():
     return {"status": "Database connected and tables created!"}
 
+@app.get("/users/")
+def get_users(db: Session = Depends(get_db)):
+    return db.query(User).all()
+
+
 @app.get("/test-db")
 def test_db(db: Session = Depends(get_db)):
     return {"message": "Successfully connected to the database session!"}
 
-# Create a new transaction
+@app.get("/users/{user_id}/advice")
+def get_advice(user_id: int, db: Session = Depends(get_db)):
+    user = db .query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+
+    total_spent_raw = db.query(func.sum(Transaction.amount)).filter(Transaction.user_id == user_id).scalar()
+    total_spent = float(total_spent_raw) if total_spent_raw is not None else 0.0
+
+    top_category = db.query(Transaction.category, func.sum(Transaction.amount).label('cat_total'))\
+        .filter(Transaction.user_id == user_id)\
+        .group_by(Transaction.category)\
+        .order_by(func.sum(Transaction.amount).desc()).first()
+
+    tips = []
+    if top_category and top_category.cat_total > 500: #ex. of threshold
+        tips.append(f"you spent ${top_category.cat_total} on {top_category.category}. A 10% reduction in spending could save you ${top_category.cat_total * 0.1:2f}!")
+
+    invest_suggestion = ""
+    if user.risk_tolerance == "Aggressive":
+        invest_suggestion = "Based on your Aggressive profile, consider adding extra funds into High-Growth Tech ETF (like QQQ)."
+    else:
+        invest_suggestion = "Based on your Moderate profile, a diversified S&P 500 Index fund is your best bet this month"
+
+    return {
+        "user_email": user.email,
+        "monthly_summary": {
+            "total_spent": total_spent,
+            "primary_expense": top_category[0] if top_category else "None"
+        },
+        "tips": tips,
+        "investment_strategy": invest_suggestion
+    }
+
+@app.post("/users/")
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = User(
+        email = user.email, 
+        risk_tolerance = user.risk_tolerance
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+# Create new transaction
 @app.post("/transactions/")
 def create_transaction(transaction: TransactionCreate, db: Session = Depends(get_db)):
     db_transaction = Transaction(
@@ -41,7 +93,7 @@ def create_transaction(transaction: TransactionCreate, db: Session = Depends(get
     db.refresh(db_transaction)
     return {"status": "success", "transaction_id": db_transaction.id}
 
-# View all transactions
+# View transactions
 @app.get("/transactions/")
 def get_transactions(db: Session = Depends(get_db)):
     # Returns all rows from the 'transactions' table
