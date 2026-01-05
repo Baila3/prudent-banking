@@ -10,14 +10,14 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# 2. THE MISSING PART: Database Models
+# 2. Database Models
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     risk_tolerance = Column(String, default="Moderate")
 
-class Transaction(Base): # <--- Ensure this name matches EXACTLY
+class Transaction(Base): 
     __tablename__ = "transactions"
     id = Column(Integer, primary_key=True, index=True)
     amount = Column(Float)
