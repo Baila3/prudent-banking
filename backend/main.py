@@ -8,21 +8,21 @@ import os
 
 # Configure the AI
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-1.5-flash-latest')
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 def get_ai_advice(user_email, risk_profile, total_spent, top_category, category_amount):
     prompt = f"""
-    You are a professional financial advisor. 
-    The user ({user_email}) has a {risk_profile} risk tolerance.
-    This month, they spent a total of ${total_spent}.
-    Their highest spending category was {top_category} at ${category_amount}.
-    
-    Provide:
-    1. A friendly one-sentence summary of their spending.
-    2. One specific tip to reduce spending in {top_category}.
-    3. One investment suggestion suitable for a {risk_profile} investor.
-    Keep the tone encouraging and concise.
-    """
+        You are a professional financial advisor. 
+        The user ({user_email}) has a {risk_profile} risk tolerance.
+        This month, they spent a total of ${total_spent}.
+        Their highest spending category was {top_category} at ${category_amount}.
+        
+        Provide:
+        1. A friendly one-sentence summary of their spending.
+        2. One specific tip to reduce spending in {top_category}.
+        3. One investment suggestion suitable for a {risk_profile} investor.
+        Keep the tone encouraging and concise.
+        """
     
     response = model.generate_content(prompt)
     return response.text
@@ -74,22 +74,28 @@ def get_fin_advice(user_id: int, db: Session = Depends(get_db)):
     top_cat = top_category[0] if top_category else "None"
     top_amount = top_category[1] if top_category else 0
 
-    #Call to AI engine
-    ai_response = get_ai_advice(
-        user.email,
-        user.risk_tolerance,
-        total_spent,
-        top_cat,
-        top_amount
-    )
+    # 4. Call to AI engine with a "Safety Shield"
+    try:
+        # Note: Ensure the model in get_ai_advice is 'gemini-1.5-flash'
+        ai_response = get_ai_advice(
+            user.email,
+            user.risk_tolerance,
+            total_spent,
+            top_cat,
+            top_amount
+        )
+    except Exception as e:
+        # If Gemini fails, we return a friendly error instead of a 500 crash
+        print(f"DEBUG AI ERROR: {str(e)}")
+        ai_response = f"AI Advice is currently shy. Technical reason: {str(e)}"
 
     return {
         "user_email": user.email,
         "monthly_summary": {
             "total_spent": total_spent,
-            "primary_expense": top_category[0] if top_category else "None"
+            "primary_expense": top_cat,
+            "primary_amount": top_amount
         },
-        "tips": tips,
         "investment_strategy": ai_response
     }
 
