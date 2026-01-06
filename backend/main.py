@@ -3,6 +3,29 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from database import engine, Base, get_db, Transaction, User
 from sqlalchemy import func
+import google.generativeai as genai
+import os
+
+# Configure the AI
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
+
+def get_ai_advice(user_email, risk_profile, total_spent, top_category, category_amount):
+    prompt = f"""
+    You are a professional financial advisor. 
+    The user ({user_email}) has a {risk_profile} risk tolerance.
+    This month, they spent a total of ${total_spent}.
+    Their highest spending category was {top_category} at ${category_amount}.
+    
+    Provide:
+    1. A friendly one-sentence summary of their spending.
+    2. One specific tip to reduce spending in {top_category}.
+    3. One investment suggestion suitable for a {risk_profile} investor.
+    Keep the tone encouraging and concise.
+    """
+    
+    response = model.generate_content(prompt)
+    return response.text
 
 Base.metadata.create_all(bind=engine)
 
@@ -35,7 +58,7 @@ def test_db(db: Session = Depends(get_db)):
     return {"message": "Successfully connected to the database session!"}
 
 @app.get("/users/{user_id}/advice")
-def get_advice(user_id: int, db: Session = Depends(get_db)):
+def get_fin_advice(user_id: int, db: Session = Depends(get_db)):
     user = db .query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
@@ -48,15 +71,17 @@ def get_advice(user_id: int, db: Session = Depends(get_db)):
         .group_by(Transaction.category)\
         .order_by(func.sum(Transaction.amount).desc()).first()
 
-    tips = []
-    if top_category and top_category.cat_total > 500: #ex. of threshold
-        tips.append(f"you spent ${top_category.cat_total} on {top_category.category}. A 10% reduction in spending could save you ${top_category.cat_total * 0.1:2f}!")
+    top_cat = top_category[0] if top_category else "None"
+    top_amount = top_category[1] if top_category else 0
 
-    invest_suggestion = ""
-    if user.risk_tolerance == "Aggressive":
-        invest_suggestion = "Based on your Aggressive profile, consider adding extra funds into High-Growth Tech ETF (like QQQ)."
-    else:
-        invest_suggestion = "Based on your Moderate profile, a diversified S&P 500 Index fund is your best bet this month"
+    #Call to AI engine
+    ai_response = get_ai_advice(
+        user.email,
+        user.risk_tolerance,
+        total_spent,
+        top_cat,
+        top_amount
+    )
 
     return {
         "user_email": user.email,
@@ -65,7 +90,7 @@ def get_advice(user_id: int, db: Session = Depends(get_db)):
             "primary_expense": top_category[0] if top_category else "None"
         },
         "tips": tips,
-        "investment_strategy": invest_suggestion
+        "investment_strategy": ai_response
     }
 
 @app.post("/users/")
