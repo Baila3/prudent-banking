@@ -4,6 +4,28 @@ from pydantic import BaseModel
 from database import engine, Base, get_db, Transaction, User
 from sqlalchemy import func
 
+import google.generativeai as genai
+
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+def get_LLM_advice(user_email,risk_profile, total_spent, top_category, category_amount):
+    prompt = f"""
+    you are a professional financial advisor.
+    The user ({user_email}) has a ({risk_profile}) risk tolerance.
+    This month they spent a total of ${total_spent}.
+    Their highest spending category was {top_category} at ${category_amount}.
+
+    Provide:
+    1. a friendly one-sentence summary of their spending.
+    2. one specific tip to reduce their spending in {top_category}.
+    3. one investement solution suitable for a {risk_profile} investor.
+    Keep tone encouraging and concise.
+    """
+
+    response = model.generate_content(prompt)
+    return response.text
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()

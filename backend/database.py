@@ -3,10 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
-import google.generativeai as genai
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-1.5-flash')
 
 # 1. Connection Setup
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:password123@db:5432/finance_tracker")
