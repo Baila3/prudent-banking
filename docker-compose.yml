@@ -25,6 +25,5 @@ services:
       - db
     environment:
       DATABASE_URL: postgresql://admin:password123@db:5432/finance_tracker
-      - GEMINI_API_KEY = AIzaSyAc3HNPPXnR8ddzBtjbJB4YG31tiNWS_W4
     volumes:
       - ./backend:/app
