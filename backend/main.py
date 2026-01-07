@@ -15,11 +15,11 @@ def get_ai_advice(user_email, risk_profile,income, total_spent, top_category, ca
     prompt = f"""
         You are a financial expert. Analyze this data:
         User: {user_email} | Monthly Income: ${income} | Total Spent: ${total_spent}
-        Top Category: {top_cat} (${cat_amount}) | Risk: {risk_profile}
+        Top Category: {top_category} (${category_amount}) | Risk: {risk_profile}
         
         Return a JSON object with:
         - 'summary': A friendly 1-sentence recap.
-        - 'spending_tip': One way to reduce the {top_cat} expense.
+        - 'spending_tip': One way to reduce the {top_category} expense.
         - 'investment_suggestion': A {risk_profile} strategy for the ${savings} left over.
         - 'savings_rate_evaluation': Assessment of their { (savings/income)*100 if income > 0 else 0 } % savings rate.
         """
@@ -82,36 +82,30 @@ def get_fin_advice(user_id: int, db: Session = Depends(get_db)):
     top_cat = top_category[0] if top_category else "None"
     top_amount = top_category[1] if top_category else 0
 
-    # 4. Call to AI engine with a "Safety Shield"
+    # Call AI
     try:
-        # Note: Ensure the model in get_ai_advice is 'gemini-1.5-flash'
-        ai_response = get_ai_advice(
-            user.email,
-            user.risk_tolerance,
-            total_spent,
-            top_cat,
-            top_amount
-        )
+        import json
+        ai_raw = get_ai_advice(user.email,user.risk_tolerance,user.monthly_income,total_spent,top_cat,top_amount)
+        ai_json = json.loads(ai_raw)
+
     except Exception as e:
-        # If Gemini fails, we return a friendly error instead of a 500 crash
-        print(f"DEBUG AI ERROR: {str(e)}")
-        ai_response = f"AI Advice is currently shy. Technical reason: {str(e)}"
+        ai_json = {"error": str(e)}
 
     return {
-        "user_email": user.email,
-        "monthly_summary": {
+        "user_info": {"email": user.email, "income": user.monthly_income},
+        "financial_stats": {
             "total_spent": total_spent,
-            "primary_expense": top_cat,
-            "primary_amount": top_amount
+            "remaining_budget": user.monthly_income - total_spent
         },
-        "investment_strategy": ai_response
+        "ai_analysis": ai_json
     }
 
 @app.post("/users/")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db_user = User(
         email = user.email, 
-        risk_tolerance = user.risk_tolerance
+        risk_tolerance = user.risk_tolerance,
+        monthly_income = user.monthly_income
     )
     db.add(db_user)
     db.commit()
