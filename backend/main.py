@@ -44,11 +44,23 @@ class UserCreate(BaseModel):
     email: str
     risk_tolerance: str
     monthly_income: float
+
+class TransactionResponse(BaseModel):
+    id: int
+    amount: float
+    category: str
+    merchant: str
+
+    class Config:
+        from_attributes = True
+
 class AIAdviceResponse(BaseModel):
     summary: str
     spending_tip: str
     investment_suggestion: str
     saving_rate_evaluation: str
+    recent_transactions: list[TransactionResponse]
+
 
 # --- ROUTES ---
 
@@ -74,6 +86,9 @@ def get_fin_advice(user_id: int, db: Session = Depends(get_db)):
     total_spent_raw = db.query(func.sum(Transaction.amount)).filter(Transaction.user_id == user_id).scalar()
     total_spent = float(total_spent_raw) if total_spent_raw is not None else 0.0
 
+    transactions = db.query(Transaction).filter(Transaction.user_id == user_id)\
+        .order_by(Transaction.id.desc()).limit(10).all()
+
     top_category = db.query(Transaction.category, func.sum(Transaction.amount).label('cat_total'))\
         .filter(Transaction.user_id == user_id)\
         .group_by(Transaction.category)\
@@ -97,7 +112,8 @@ def get_fin_advice(user_id: int, db: Session = Depends(get_db)):
             "total_spent": total_spent,
             "remaining_budget": user.monthly_income - total_spent
         },
-        "ai_analysis": ai_json
+        "ai_analysis": ai_json,
+        "recent_transactions": transactions
     }
 
 @app.post("/users/")
