@@ -20,6 +20,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     risk_tolerance = Column(String, default="Moderate")
+    monthly_income = Column(Float,default=0.0)
 
 class Transaction(Base): 
     __tablename__ = "transactions"

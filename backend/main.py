@@ -8,23 +8,26 @@ import os
 
 # Configure the AI
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-2.5-flash')
 
-def get_ai_advice(user_email, risk_profile, total_spent, top_category, category_amount):
+def get_ai_advice(user_email, risk_profile,income, total_spent, top_category, category_amount):
+    model = genai.GenerativeModel('gemini-2.5-flash')
+    savings = income - total_spent
     prompt = f"""
-        You are a professional financial advisor. 
-        The user ({user_email}) has a {risk_profile} risk tolerance.
-        This month, they spent a total of ${total_spent}.
-        Their highest spending category was {top_category} at ${category_amount}.
+        You are a financial expert. Analyze this data:
+        User: {user_email} | Monthly Income: ${income} | Total Spent: ${total_spent}
+        Top Category: {top_cat} (${cat_amount}) | Risk: {risk_profile}
         
-        Provide:
-        1. A friendly one-sentence summary of their spending.
-        2. One specific tip to reduce spending in {top_category}.
-        3. One investment suggestion suitable for a {risk_profile} investor.
-        Keep the tone encouraging and concise.
+        Return a JSON object with:
+        - 'summary': A friendly 1-sentence recap.
+        - 'spending_tip': One way to reduce the {top_cat} expense.
+        - 'investment_suggestion': A {risk_profile} strategy for the ${savings} left over.
+        - 'savings_rate_evaluation': Assessment of their { (savings/income)*100 if income > 0 else 0 } % savings rate.
         """
     
-    response = model.generate_content(prompt)
+    response = model.generate_content(
+        prompt,
+        generation_config={"response_mime_type": "application/json"}
+    )
     return response.text
 
 Base.metadata.create_all(bind=engine)
@@ -40,7 +43,12 @@ class TransactionCreate(BaseModel):
 class UserCreate(BaseModel):
     email: str
     risk_tolerance: str
-
+    monthly_income: float
+class AIAdviceResponse(BaseModel):
+    summary: str
+    spending_tip: str
+    investment_suggestion: str
+    saving_rate_evaluation: str
 
 # --- ROUTES ---
 
