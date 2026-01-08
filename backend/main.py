@@ -34,7 +34,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-
+#Database Models
 class TransactionCreate(BaseModel):
     amount: float
     category: str
