@@ -8,13 +8,13 @@ import google.generativeai as genai
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# 1. Connection Setup
+#Connection Setup
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:password123@db:5432/finance_tracker")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# 2. Database Models
+#Database Models
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -31,7 +31,7 @@ class Transaction(Base):
     date = Column(DateTime, default=datetime.utcnow)
     user_id = Column(Integer, ForeignKey("users.id"))
 
-# 3. Database Session Helper
+#Database Session Helper
 def get_db():
     db = SessionLocal()
     try:
